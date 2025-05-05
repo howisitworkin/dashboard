@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 @app.route("/metrics")
 def metrics():
-	data = get_metrics()
+	data = collect_metrics()
 	return jsonify(data)
 
 if __name__ == "__main__":
