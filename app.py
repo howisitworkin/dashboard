@@ -1,5 +1,5 @@
 from flask import Flask, jsonify
-from collect import collect_metrics
+from collector import collect_metrics
 
 app = Flask(__name__)
 
