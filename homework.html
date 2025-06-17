@@ -106,7 +106,6 @@
 <body>
   <h1>시스템 모니터링 대시보드</h1>
 
-  <!-- 사용자 설정 -->
   <div class="controls">
     업데이트 주기:
     <select id="intervalSelector">
@@ -120,7 +119,6 @@
     <input type="number" id="cpuThreshold" value="90" min="10" max="100" style="width: 60px;" /> %
   </div>
 
-  <!-- 상태 박스 -->
   <div class="container">
     <div class="box">
       <h2>CPU</h2>
@@ -136,13 +134,11 @@
     </div>
   </div>
 
-  <!-- 막대 그래프 -->
   <h2>가장 최신 데이터</h2>
   <div class="chart-container">
     <canvas id="barChart"></canvas>
   </div>
 
-  <!-- 개별 라인 그래프 -->
   <h2>개별 데이터</h2>
   <div class="line-charts">
     <div class="line-box"><h3>CPU</h3><canvas id="cpuLine"></canvas></div>
@@ -150,7 +146,6 @@
     <div class="line-box"><h3>디스크</h3><canvas id="diskLine"></canvas></div>
   </div>
 
-  <!-- 기록 -->
   <div id="recordList"><h3>기록</h3></div>
 
   <script>
@@ -159,44 +154,38 @@
     const ramLineCtx = document.getElementById('ramLine').getContext('2d');
     const diskLineCtx = document.getElementById('diskLine').getContext('2d');
 
-    const createLineChart = (ctx, label, color) => {
-      return new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: [],
-          datasets: [{
-            label,
-            data: [],
-            borderColor: color,
-            backgroundColor: 'transparent',
-            fill: false,
-            tension: 0,
-            pointRadius: 4,
-            pointHoverRadius: 6
-          }]
+    const createLineChart = (ctx, label, color) => new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label,
+          data: [],
+          borderColor: color,
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: 0,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          x: { display: false },
+          y: { display: false, min: 0, max: 100 }
         },
-        options: {
-          responsive: true,
-          animation: false,
-          scales: {
-            x: { display: false },
-            y: { display: false, min: 0, max: 100 }
-          },
-          plugins: {
-            legend: { display: false },
-            datalabels: {
-              align: 'top',
-              anchor: 'end',
-              offset: 8,
-              color: '#000',
-              font: { size: 10 },
-              formatter: v => `${v}%`
-            }
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            align: 'top', anchor: 'end', offset: 8, color: '#000',
+            font: { size: 10 }, formatter: v => `${v}%`
           }
-        },
-        plugins: [ChartDataLabels]
-      });
-    };
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
 
     const barChart = new Chart(barCtx, {
       type: 'bar',
@@ -225,15 +214,12 @@
     let intervalHandle;
     let updateInterval = parseInt(document.getElementById("intervalSelector").value);
 
-    function playAlertSound() {
+    function playAlertSound(cpu, threshold) {
       const audio = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
-      audio.play().then(() => {
-    alert(`⚠️ CPU 사용률 ${cpu}% (임계치 ${threshold}%) 초과!`);
-  }).catch((err) => {
-    console.warn("사운드 재생 실패:", err);
-    alert(`⚠️ CPU 사용률 ${cpu}% (임계치 ${threshold}%) 초과!`);
-  });
-}
+      audio.volume = 0.8;
+      audio.play().catch(err => console.warn("사운드 재생 실패:", err));
+      alert(`⚠️ CPU 사용률 ${cpu}% (임계치 ${threshold}%) 초과!`);
+    }
 
     async function updateChart() {
       try {
@@ -252,10 +238,7 @@
         diskElem.textContent = `${disk}%`;
 
         cpuElem.style.color = cpu >= threshold ? 'red' : '#000';
-        if (cpu >= threshold) {
-          alert(`⚠️ CPU 사용률 ${cpu}% (임계치 ${threshold}%) 초과!`);
-          playAlertSound();
-        }
+        if (cpu >= threshold) playAlertSound(cpu, threshold);
 
         barChart.data.datasets[0].data = [cpu, ram, disk];
         barChart.update();
