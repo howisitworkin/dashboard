@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시스템 모니터링 대시보드</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       background-color: #f2f2f2;
@@ -47,7 +47,7 @@
 
     .chart-container {
       max-width: 800px;
-      margin: 0 auto 40px auto;
+      margin: 0 auto 60px auto;
       padding: 20px;
       border: 3px solid #444;
       background-color: #fff;
@@ -66,16 +66,11 @@
       border-bottom: 1px solid #ddd;
       text-align: left;
     }
-
-    #viewSelector {
-      margin: 10px;
-      font-size: 16px;
-      padding: 5px;
-    }
   </style>
 </head>
 <body>
   <h1>시스템 모니터링 대시보드</h1>
+
   <div class="container">
     <div class="box">
       <h2>CPU</h2>
@@ -91,18 +86,23 @@
     </div>
   </div>
 
-  <h2 id="chartTitle">실시간 라인 그래프</h2>
-  <select id="viewSelector">
-    <option value="line">실시간 라인 그래프</option>
-    <option value="bar">실시간 막대 그래프</option>
-  </select>
+  <!-- ✅ 사용자 설정 UI -->
+  <div style="margin-bottom: 30px;">
+    <label>업데이트 주기:
+      <select id="intervalSelect">
+        <option value="10000">10초</option>
+        <option value="30000" selected>30초</option>
+        <option value="60000">60초</option>
+      </select>
+    </label>
+
+    <label style="margin-left: 20px;">CPU 경고 임계치:
+      <input type="number" id="cpuThreshold" value="90" min="10" max="100" />
+    </label>
+  </div>
 
   <div class="chart-container">
     <canvas id="systemChart"></canvas>
-  </div>
-
-  <div class="chart-container" style="max-width: 300px;">
-    <canvas id="pieChart"></canvas>
   </div>
 
   <div id="recordList">
@@ -111,88 +111,80 @@
 
   <script>
     const ctx = document.getElementById('systemChart').getContext('2d');
-    const pieCtx = document.getElementById('pieChart').getContext('2d');
-    let chartType = 'line';
-
-    const createSystemChart = (type) => {
-      chartType = type;
-      return new Chart(ctx, {
-        type: type,
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label: 'CPU (%)',
-              data: [],
-              borderColor: '#444',
-              backgroundColor: type === 'bar' ? 'rgba(68, 68, 68, 0.5)' : 'transparent',
-              barPercentage: 0.5,
-              fill: false
-            },
-            {
-              label: 'RAM (%)',
-              data: [],
-              borderColor: '#aaa',
-              backgroundColor: type === 'bar' ? 'rgba(170, 170, 170, 0.5)' : 'transparent',
-              barPercentage: 0.5,
-              fill: false
-            },
-            {
-              label: 'Disk (%)',
-              data: [],
-              borderColor: '#87CEFA',
-              backgroundColor: type === 'bar' ? 'rgba(135, 206, 250, 0.5)' : 'transparent',
-              barPercentage: 0.5,
-              fill: false
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          animation: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              max: 100,
-              ticks: {
-                stepSize: 10
-              }
+    const systemChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'CPU (%)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            data: [],
+          },
+          {
+            label: 'RAM (%)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            data: [],
+          },
+          {
+            label: 'Disk (%)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            data: [],
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            ticks: {
+              stepSize: 10
             }
           }
         }
-      });
-    };
-
-    let systemChart = createSystemChart(chartType);
-
-    const pieChart = new Chart(pieCtx, {
-      type: 'pie',
-      data: {
-        labels: ['CPU', 'RAM', 'Disk'],
-        datasets: [{
-          data: [0, 0, 0],
-          backgroundColor: ['#444', '#aaa', '#87CEFA']
-        }]
-      },
-      options: {
-        responsive: true
       }
+    });
+
+    let updateInterval = 30000;
+    let intervalHandle = null;
+
+    function startInterval() {
+      if (intervalHandle) clearInterval(intervalHandle);
+      intervalHandle = setInterval(updateChart, updateInterval);
+    }
+
+    document.getElementById("intervalSelect").addEventListener("change", e => {
+      updateInterval = parseInt(e.target.value);
+      startInterval();
     });
 
     async function updateChart() {
       try {
-        const cpu = Math.floor(Math.random() * 100);
-        const ram = Math.floor(Math.random() * 100);
-        const disk = Math.floor(Math.random() * 100);
+        const response = await fetch('/metrics');
+        const data = await response.json();
+        const cpu = data.cpu;
+        const ram = data.ram.percent;
+        const disk = data.disk.percent;
+
         const time = new Date().toLocaleTimeString();
 
         document.getElementById('cpu-usage').textContent = `${cpu}%`;
         document.getElementById('ram-usage').textContent = `${ram}%`;
         document.getElementById('disk-usage').textContent = `${disk}%`;
 
-        const maxDataCount = chartType === 'bar' ? 3 : 7;
+        // ⚠️ 임계치 경고
+        const threshold = parseInt(document.getElementById("cpuThreshold").value);
+        if (cpu > threshold) {
+          alert(`⚠️ CPU 사용률 ${cpu}% (임계치 ${threshold}%) 초과!`);
+        }
 
-        if (systemChart.data.labels.length >= maxDataCount) {
+        if (systemChart.data.labels.length >= 10) {
           systemChart.data.labels.shift();
           systemChart.data.datasets.forEach(ds => ds.data.shift());
         }
@@ -204,18 +196,10 @@
 
         systemChart.update();
 
-        pieChart.data.datasets[0].data = [cpu, ram, disk];
-        pieChart.update();
-
         const recordList = document.getElementById('recordList');
         const recordItem = document.createElement('div');
         recordItem.classList.add('record');
         recordItem.textContent = `${time} - CPU: ${cpu}%, RAM: ${ram}%, Disk: ${disk}%`;
-
-        const records = recordList.querySelectorAll('.record');
-        if (records.length >= 5) {
-          recordList.removeChild(records[0]);
-        }
         recordList.appendChild(recordItem);
 
       } catch (err) {
@@ -223,31 +207,8 @@
       }
     }
 
-    document.getElementById('viewSelector').addEventListener('change', (e) => {
-      const newType = e.target.value;
-      chartType = newType;
-      const chartTitle = document.getElementById('chartTitle');
-      chartTitle.textContent = newType === 'line' ? '실시간 라인 그래프' : '실시간 막대 그래프';
-
-      const labels = [...systemChart.data.labels];
-      const dataset0 = [...systemChart.data.datasets[0].data];
-      const dataset1 = [...systemChart.data.datasets[1].data];
-      const dataset2 = [...systemChart.data.datasets[2].data];
-
-      systemChart.destroy();
-      systemChart = createSystemChart(newType);
-
-      const limit = newType === 'bar' ? 3 : 7;
-      systemChart.data.labels = labels.slice(-limit);
-      systemChart.data.datasets[0].data = dataset0.slice(-limit);
-      systemChart.data.datasets[1].data = dataset1.slice(-limit);
-      systemChart.data.datasets[2].data = dataset2.slice(-limit);
-
-      systemChart.update();
-    });
-
     updateChart();
-    setInterval(updateChart, 10000);
+    startInterval();
   </script>
 </body>
 </html>
