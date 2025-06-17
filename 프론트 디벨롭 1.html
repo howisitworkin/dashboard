@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>시스템 모니터링 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body {
+      background-color: #f2f2f2;
+      font-family: 'Pretendard', sans-serif;
+      color: #333;
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-top: 30px;
+      color: #222;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin: 40px auto;
+    }
+
+    .box {
+      border: 3px solid #444;
+      padding: 20px;
+      width: 180px;
+      background-color: #fff;
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .box h2 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #000;
+    }
+
+    .box p {
+      font-size: 20px;
+      color: #000;
+    }
+
+    .chart-container {
+      max-width: 800px;
+      margin: 0 auto 40px auto;
+      padding: 20px;
+      border: 3px solid #444;
+      background-color: #fff;
+    }
+
+    #recordList {
+      max-width: 800px;
+      margin: 0 auto 40px auto;
+      background-color: #fff;
+      padding: 20px;
+      border: 3px solid #444;
+    }
+
+    .record {
+      padding: 5px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    #viewSelector {
+      margin: 10px;
+      font-size: 16px;
+      padding: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>시스템 모니터링 대시보드</h1>
+  <div class="container">
+    <div class="box">
+      <h2>CPU</h2>
+      <p id="cpu-usage">00%</p>
+    </div>
+    <div class="box">
+      <h2>RAM</h2>
+      <p id="ram-usage">00%</p>
+    </div>
+    <div class="box">
+      <h2>디스크</h2>
+      <p id="disk-usage">00%</p>
+    </div>
+  </div>
+
+  <h2 id="chartTitle">실시간 라인 그래프</h2>
+  <select id="viewSelector">
+    <option value="line">실시간 라인 그래프</option>
+    <option value="bar">실시간 막대 그래프</option>
+  </select>
+
+  <div class="chart-container">
+    <canvas id="systemChart"></canvas>
+  </div>
+
+  <div class="chart-container" style="max-width: 300px;">
+    <canvas id="pieChart"></canvas>
+  </div>
+
+  <div id="recordList">
+    <h3>기록</h3>
+  </div>
+
+  <script>
+    const ctx = document.getElementById('systemChart').getContext('2d');
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+    let chartType = 'line';
+
+    const createSystemChart = (type) => {
+      chartType = type;
+      return new Chart(ctx, {
+        type: type,
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'CPU (%)',
+              data: [],
+              borderColor: '#444',
+              backgroundColor: type === 'bar' ? 'rgba(68, 68, 68, 0.5)' : 'transparent',
+              barPercentage: 0.5,
+              fill: false
+            },
+            {
+              label: 'RAM (%)',
+              data: [],
+              borderColor: '#aaa',
+              backgroundColor: type === 'bar' ? 'rgba(170, 170, 170, 0.5)' : 'transparent',
+              barPercentage: 0.5,
+              fill: false
+            },
+            {
+              label: 'Disk (%)',
+              data: [],
+              borderColor: '#87CEFA',
+              backgroundColor: type === 'bar' ? 'rgba(135, 206, 250, 0.5)' : 'transparent',
+              barPercentage: 0.5,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                stepSize: 10
+              }
+            }
+          }
+        }
+      });
+    };
+
+    let systemChart = createSystemChart(chartType);
+
+    const pieChart = new Chart(pieCtx, {
+      type: 'pie',
+      data: {
+        labels: ['CPU', 'RAM', 'Disk'],
+        datasets: [{
+          data: [0, 0, 0],
+          backgroundColor: ['#444', '#aaa', '#87CEFA']
+        }]
+      },
+      options: {
+        responsive: true
+      }
+    });
+
+    async function updateChart() {
+      try {
+        const cpu = Math.floor(Math.random() * 100);
+        const ram = Math.floor(Math.random() * 100);
+        const disk = Math.floor(Math.random() * 100);
+        const time = new Date().toLocaleTimeString();
+
+        document.getElementById('cpu-usage').textContent = `${cpu}%`;
+        document.getElementById('ram-usage').textContent = `${ram}%`;
+        document.getElementById('disk-usage').textContent = `${disk}%`;
+
+        const maxDataCount = chartType === 'bar' ? 3 : 7;
+
+        if (systemChart.data.labels.length >= maxDataCount) {
+          systemChart.data.labels.shift();
+          systemChart.data.datasets.forEach(ds => ds.data.shift());
+        }
+
+        systemChart.data.labels.push(time);
+        systemChart.data.datasets[0].data.push(cpu);
+        systemChart.data.datasets[1].data.push(ram);
+        systemChart.data.datasets[2].data.push(disk);
+
+        systemChart.update();
+
+        pieChart.data.datasets[0].data = [cpu, ram, disk];
+        pieChart.update();
+
+        const recordList = document.getElementById('recordList');
+        const recordItem = document.createElement('div');
+        recordItem.classList.add('record');
+        recordItem.textContent = `${time} - CPU: ${cpu}%, RAM: ${ram}%, Disk: ${disk}%`;
+
+        const records = recordList.querySelectorAll('.record');
+        if (records.length >= 5) {
+          recordList.removeChild(records[0]);
+        }
+        recordList.appendChild(recordItem);
+
+      } catch (err) {
+        console.error('데이터 업데이트 실패:', err);
+      }
+    }
+
+    document.getElementById('viewSelector').addEventListener('change', (e) => {
+      const newType = e.target.value;
+      chartType = newType;
+      const chartTitle = document.getElementById('chartTitle');
+      chartTitle.textContent = newType === 'line' ? '실시간 라인 그래프' : '실시간 막대 그래프';
+
+      const labels = [...systemChart.data.labels];
+      const dataset0 = [...systemChart.data.datasets[0].data];
+      const dataset1 = [...systemChart.data.datasets[1].data];
+      const dataset2 = [...systemChart.data.datasets[2].data];
+
+      systemChart.destroy();
+      systemChart = createSystemChart(newType);
+
+      const limit = newType === 'bar' ? 3 : 7;
+      systemChart.data.labels = labels.slice(-limit);
+      systemChart.data.datasets[0].data = dataset0.slice(-limit);
+      systemChart.data.datasets[1].data = dataset1.slice(-limit);
+      systemChart.data.datasets[2].data = dataset2.slice(-limit);
+
+      systemChart.update();
+    });
+
+    updateChart();
+    setInterval(updateChart, 10000);
+  </script>
+</body>
+</html>
