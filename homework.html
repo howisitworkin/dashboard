@@ -3,14 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>시스템 모니터링 대시보드</title>
+  <title>ΣΣΣ 시스템 모니터링 대시보드</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body {
       background-color: #f2f2f2;
       font-family: 'Pretendard', sans-serif;
+      color: #333;
       text-align: center;
       padding: 20px;
+    }
+    h1 {
+      margin-top: 30px;
+      color: #222;
     }
     .container {
       display: flex;
@@ -28,6 +33,7 @@
     .box h2 {
       font-size: 24px;
       margin-bottom: 10px;
+      color: #000;
     }
     .box p {
       font-size: 20px;
@@ -39,7 +45,7 @@
       border: 3px solid #444;
       background-color: #fff;
     }
-    #recordList {
+    #recordList, #historyList {
       max-width: 800px;
       margin: 0 auto 40px auto;
       background-color: #fff;
@@ -56,11 +62,13 @@
       font-size: 16px;
       padding: 5px;
     }
+    #history-control {
+      margin: 40px auto 20px auto;
+    }
   </style>
 </head>
 <body>
-  <h1>시스템 모니터링 대시보드</h1>
-
+  <h1>Σ 시스템 모니터링 대시보드</h1>
   <div class="container">
     <div class="box">
       <h2>CPU</h2>
@@ -85,7 +93,6 @@
         <option value="60000">60초</option>
       </select>
     </label>
-
     <label style="margin-left: 20px;">CPU 경고 임계치:
       <input type="number" id="cpuThreshold" value="90" min="10" max="100" style="width: 60px;" />%
     </label>
@@ -106,7 +113,21 @@
   </div>
 
   <div id="recordList">
-    <h3>기록</h3>
+    <h3>실시간 기록</h3>
+  </div>
+
+  <div id="history-control">
+    <label for="hours">조회 시간: </label>
+    <select id="hours">
+      <option value="1">1시간</option>
+      <option value="2">2시간</option>
+      <option value="3">3시간</option>
+    </select>
+    <button onclick="loadHistory()">기록 보기</button>
+  </div>
+
+  <div id="historyList">
+    <h3>과거 기록</h3>
   </div>
 
   <script>
@@ -115,9 +136,7 @@
     let chartType = 'line';
     let updateInterval = 30000;
     let intervalHandle = null;
-
     const alertAudio = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
-    alertAudio.volume = 1.0;
 
     const createSystemChart = (type) => {
       chartType = type;
@@ -159,7 +178,9 @@
             y: {
               beginAtZero: true,
               max: 100,
-              ticks: { stepSize: 10 }
+              ticks: {
+                stepSize: 10
+              }
             }
           }
         }
@@ -191,23 +212,22 @@
         const disk = data.disk.percent;
         const time = new Date().toLocaleTimeString();
 
-        const threshold = parseInt(document.getElementById("cpuThreshold").value);
-
-        // 수치 텍스트 반영 + 색상 강조
         const cpuElem = document.getElementById('cpu-usage');
         cpuElem.textContent = `${cpu}%`;
+
+        const threshold = parseInt(document.getElementById("cpuThreshold").value);
         cpuElem.style.color = cpu > threshold ? 'red' : '#000';
 
         document.getElementById('ram-usage').textContent = `${ram}%`;
         document.getElementById('disk-usage').textContent = `${disk}%`;
 
         if (cpu > threshold) {
-          alertAudio.play().catch(err => console.warn("사운드 재생 실패:", err));
+          alertAudio.play().catch(() => {});
           setTimeout(() => {
             alert(`⚠️ CPU 사용률 ${cpu}% (임계치 ${threshold}%) 초과!`);
             alertAudio.pause();
             alertAudio.currentTime = 0;
-          }, 100);
+          }, 10);
         }
 
         const maxDataCount = chartType === 'bar' ? 3 : 7;
@@ -231,11 +251,29 @@
         recordItem.textContent = `${time} - CPU: ${cpu}%, RAM: ${ram}%, Disk: ${disk}%`;
 
         const records = recordList.querySelectorAll('.record');
-        if (records.length >= 5) recordList.removeChild(records[0]);
+        if (records.length >= 5) {
+          recordList.removeChild(records[0]);
+        }
         recordList.appendChild(recordItem);
       } catch (err) {
         console.error('데이터 업데이트 실패:', err);
       }
+    }
+
+    async function loadHistory() {
+      const hours = document.getElementById("hours").value;
+      const response = await fetch(`/history?hours=${hours}`);
+      const historyData = await response.json();
+
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '<h3>과거 기록</h3>';
+
+      historyData.forEach(entry => {
+        const recordItem = document.createElement('div');
+        recordItem.classList.add('record');
+        recordItem.textContent = `${entry.time} - CPU: ${entry.cpu}%, RAM: ${entry.ram}%, Disk: ${entry.disk}%`;
+        historyList.appendChild(recordItem);
+      });
     }
 
     function startInterval() {
@@ -246,8 +284,8 @@
     document.getElementById('viewSelector').addEventListener('change', (e) => {
       const newType = e.target.value;
       chartType = newType;
-      document.getElementById('chartTitle').textContent =
-        newType === 'line' ? '실시간 라인 그래프' : '실시간 막대 그래프';
+      const chartTitle = document.getElementById('chartTitle');
+      chartTitle.textContent = newType === 'line' ? '실시간 라인 그래프' : '실시간 막대 그래프';
 
       const labels = [...systemChart.data.labels];
       const dataset0 = [...systemChart.data.datasets[0].data];
@@ -262,6 +300,7 @@
       systemChart.data.datasets[0].data = dataset0.slice(-limit);
       systemChart.data.datasets[1].data = dataset1.slice(-limit);
       systemChart.data.datasets[2].data = dataset2.slice(-limit);
+
       systemChart.update();
     });
 
